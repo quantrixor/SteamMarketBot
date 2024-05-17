@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using SteamKit2;
 using SteamKit2.GC;
 using SteamKit2.GC.CSGO.Internal;
+using SteamKit2.Internal;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -117,6 +118,10 @@ public class Program
     {
         Console.WriteLine("Disconnected from Steam");
         isRunning = false;
+
+        // Попробуем переподключиться после разрыва связи
+        Thread.Sleep(5000); // Задержка перед переподключением
+        steamClient.Connect();
     }
 
     static void OnLoggedOn(SteamUser.LoggedOnCallback callback)
@@ -129,6 +134,17 @@ public class Program
         }
 
         Console.WriteLine("Successfully logged on!");
+
+        // Подключаемся к Game Coordinator
+        var playGames = new ClientMsgProtobuf<CMsgClientGamesPlayed>(EMsg.ClientGamesPlayed);
+        playGames.Body.games_played.Add(new CMsgClientGamesPlayed.GamePlayed
+        {
+            game_id = new GameID(APPID)
+        });
+        steamClient.Send(playGames);
+
+        Thread.Sleep(5000); // Задержка для установки соединения с GC
+        gameCoordinator.Send(new ClientGCMsgProtobuf<SteamKit2.GC.Artifact.Internal.CMsgClientHello>((uint)EGCBaseClientMsg.k_EMsgGCClientHello), APPID);
     }
 
     static void OnLoggedOff(SteamUser.LoggedOffCallback callback)
@@ -177,6 +193,10 @@ public class Program
                 Console.WriteLine("Failed to find pending request for instanceId.");
             }
         }
+        else if (msg.MsgType == (uint)EGCBaseClientMsg.k_EMsgGCClientWelcome)
+        {
+            Console.WriteLine("Received ClientWelcome message.");
+        }
         else
         {
             Console.WriteLine($"Received unhandled GC message: {msg.MsgType}");
@@ -212,7 +232,7 @@ public class Program
         Console.WriteLine($"Sending request to GC for instanceId: {instanceId}");
         gameCoordinator.Send(msg, APPID);
 
-        var timeoutTask = Task.Delay(10000); // 10 секунд таймаут
+        var timeoutTask = Task.Delay(15000); // 15 секунд таймаут
         var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
 
         if (completedTask == timeoutTask)
