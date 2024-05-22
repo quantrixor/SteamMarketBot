@@ -36,6 +36,7 @@ public class Program
                                           return;
                                       }
 
+                                      Console.WriteLine($"Received link: {link}");
                                       var instanceId = ParseInstanceIdFromLink(link);
                                       if (string.IsNullOrEmpty(instanceId))
                                       {
@@ -44,6 +45,7 @@ public class Program
                                           return;
                                       }
 
+                                      Console.WriteLine($"Parsed instance ID: {instanceId}");
                                       var itemDetails = await FetchItemDetails(instanceId);
                                       if (itemDetails != null)
                                       {
@@ -74,11 +76,13 @@ public class Program
             }
             return null;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"Error parsing link: {ex.Message}");
             return null;
         }
     }
+
 
     private static async Task<ItemDetails?> FetchItemDetails(string instanceId)
     {
